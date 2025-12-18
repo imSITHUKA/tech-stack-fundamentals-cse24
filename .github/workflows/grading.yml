@@ -1,4 +1,4 @@
-name: 📊 Automated Grading - Reddit Browser (Changed Files Only)
+name: 📊 Automated Grading - Reddit Browser (Task 03)
 
 # Trigger on every push to main/master
 on:
@@ -7,13 +7,13 @@ on:
       - main
       - master
     paths:
-      - 'Task 02/submissions/**'  # Only trigger if submissions folder changes
+      - 'Task 03/submissions/**'  # Only trigger if submissions folder changes
   pull_request:
     branches:
       - main
       - master
     paths:
-      - 'Task 02/submissions/**'
+      - 'Task 03/submissions/**'
   # Allow manual trigger from Actions tab
   workflow_dispatch:
 
@@ -32,7 +32,7 @@ jobs:
       - name: 🔍 Detect changed submissions
         id: detect
         run: |
-          SUBMISSIONS_DIR="Task 02/submissions"
+          SUBMISSIONS_DIR="Task 03/submissions"
           
           if [ ! -d "$SUBMISSIONS_DIR" ]; then
             echo "has-changes=false" >> $GITHUB_OUTPUT
@@ -55,7 +55,7 @@ jobs:
           fi
           
           # Extract student folders that changed
-          STUDENTS=$(echo "$CHANGED_FILES" | grep "Task 02/submissions/" | cut -d'/' -f4 | sort -u)
+          STUDENTS=$(echo "$CHANGED_FILES" | grep "Task 03/submissions/" | cut -d'/' -f4 | sort -u)
           
           if [ -z "$STUDENTS" ]; then
             echo "ℹ️  No submissions changed"
@@ -95,7 +95,7 @@ jobs:
           import json
           import re
           
-          SUBMISSIONS_DIR = "Task 02/submissions"
+          SUBMISSIONS_DIR = "Task 03/submissions"
           CHANGED_STUDENTS = """${{ needs.detect-changes.outputs.changed-students }}""".strip().split('\n')
           
           print("🎯 Grading changed submissions only:")
@@ -105,12 +105,14 @@ jobs:
           print()
           
           def grade_submission(student_folder, index_file):
-              """Grade a single submission"""
+              """Grade a single submission based on Reddit Browser requirements"""
               with open(index_file, 'r', encoding='utf-8') as f:
-                  content = f.read().lower()
+                  content = f.read()
+              
+              content_lower = content.lower()
               
               scores = {
-                  'file_structure': 2,
+                  'file_structure': 5,
                   'functionality': 0,
                   'ui_design': 0,
                   'code_quality': 0,
@@ -118,71 +120,109 @@ jobs:
                   'issues': []
               }
               
-              # Functionality checks (max 40)
-              if 'fetch(' in content:
+              # ===== FUNCTIONALITY (40 points) =====
+              
+              # Step 1: Fetch Reddit API (8 pts)
+              if 'fetch(' in content_lower and 'reddit.com' in content_lower:
                   scores['functionality'] += 8
               else:
-                  scores['issues'].append('❌ No fetch() API call')
+                  scores['issues'].append('❌ No Reddit API fetch')
               
-              if 'reddit.com' in content:
+              # Step 2: Display posts function (8 pts)
+              if re.search(r'function\s+displayposts|displayposts\s*=|const\s+displayposts', content_lower):
                   scores['functionality'] += 8
               else:
-                  scores['issues'].append('❌ No Reddit API URL')
+                  scores['issues'].append('❌ No displayPosts function')
               
-              if 'search' in content or 'input' in content:
+              # Step 4: Search/loadPosts function (8 pts)
+              if re.search(r'function\s+loadposts|loadposts\s*=|getelementbyid.*input', content_lower):
                   scores['functionality'] += 8
               else:
-                  scores['issues'].append('⚠️  No search feature')
+                  scores['issues'].append('⚠️ No loadPosts/search function')
               
-              if 'catch' in content or 'try' in content:
+              # Async/await or .then() (6 pts)
+              if 'async' in content_lower or '.then(' in content_lower:
+                  scores['functionality'] += 6
+              else:
+                  scores['issues'].append('⚠️ No async handling')
+              
+              # Error handling (10 pts)
+              if 'catch' in content_lower or 'try' in content_lower:
                   scores['functionality'] += 10
               else:
                   scores['issues'].append('❌ No error handling')
               
-              if 'onload' in content or 'eventlistener' in content:
-                  scores['functionality'] += 6
+              # ===== UI/DESIGN (30 points) =====
               
-              # UI/Design checks (max 30)
-              if 'grid' in content:
+              # Step 3: Grid layout (10 pts)
+              if 'display: grid' in content_lower or 'display:grid' in content_lower:
                   scores['ui_design'] += 10
-              else:
-                  scores['issues'].append('❌ No grid layout')
-              
-              if 'img' in content or 'image' in content:
-                  scores['ui_design'] += 8
-              else:
-                  scores['issues'].append('⚠️  No image handling')
-              
-              if 'comment' in content or 'upvote' in content or 'author' in content:
-                  scores['ui_design'] += 7
-              
-              if '<style>' in content:
+              elif 'grid' in content_lower:
                   scores['ui_design'] += 5
               else:
-                  scores['issues'].append('⚠️  Minimal CSS')
+                  scores['issues'].append('❌ No CSS grid layout')
               
-              # Code Quality (max 15)
-              function_count = content.count('function ')
-              if function_count >= 2:
-                  scores['code_quality'] += 5
-              
-              bad_vars = len(re.findall(r'var [a-z] [=;]', content))
-              if bad_vars < 3:
-                  scores['code_quality'] += 5
+              # Post cards with images (8 pts)
+              if 'post-card' in content_lower or 'postcard' in content_lower:
+                  scores['ui_design'] += 4
+              if '<img' in content_lower and 'thumbnail' in content_lower:
+                  scores['ui_design'] += 4
               else:
-                  scores['issues'].append('⚠️  Poor variable naming')
+                  scores['issues'].append('⚠️ No image/thumbnail handling')
               
-              if 'console.log' not in content or 'this is a comment' in content:
+              # Stats display: upvotes, comments, author (7 pts)
+              stats_count = 0
+              if 'ups' in content_lower or 'upvote' in content_lower:
+                  stats_count += 1
+              if 'num_comments' in content_lower or 'comment' in content_lower:
+                  stats_count += 1
+              if 'author' in content_lower:
+                  stats_count += 1
+              scores['ui_design'] += min(stats_count * 2, 7)
+              
+              # Step 5: Custom styling (5 pts)
+              if '<style>' in content_lower and len(re.findall(r'[{]', content)) > 10:
+                  scores['ui_design'] += 5
+              elif '<style>' in content_lower:
+                  scores['ui_design'] += 2
+              else:
+                  scores['issues'].append('⚠️ Minimal CSS styling')
+              
+              # ===== CODE QUALITY (15 points) =====
+              
+              # Multiple functions (5 pts)
+              function_count = len(re.findall(r'function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(', content))
+              if function_count >= 3:
+                  scores['code_quality'] += 5
+              elif function_count >= 2:
+                  scores['code_quality'] += 3
+              
+              # DOM manipulation (5 pts)
+              if 'getelementbyid' in content_lower or 'queryselector' in content_lower:
                   scores['code_quality'] += 5
               
-              # Responsive (max 10)
-              if '@media' in content:
+              # Clean code - no excessive console.log (5 pts)
+              console_count = content_lower.count('console.log')
+              if console_count <= 2:
+                  scores['code_quality'] += 5
+              elif console_count <= 5:
+                  scores['code_quality'] += 3
+              
+              # ===== RESPONSIVE DESIGN (10 points) =====
+              
+              # Media queries (8 pts)
+              if '@media' in content_lower:
                   scores['responsive'] += 8
               else:
-                  scores['issues'].append('⚠️  No @media queries')
+                  scores['issues'].append('⚠️ No @media queries for mobile')
               
-              if 'flex' in content or 'grid' in content:
+              # Flexbox or grid for responsive (2 pts)
+              if 'flex' in content_lower or 'auto-fill' in content_lower or 'auto-fit' in content_lower:
                   scores['responsive'] += 2
+              
+              # ===== BONUS: Video support (up to 5 extra) =====
+              if 'reddit_video' in content_lower or '<video' in content_lower:
+                  scores['functionality'] = min(scores['functionality'] + 5, 45)
               
               return scores
           
@@ -209,6 +249,9 @@ jobs:
                   scores['responsive']
               ])
               
+              # Cap at 100
+              total = min(total, 100)
+              
               # Determine grade
               if total >= 90:
                   grade = 'A'
@@ -232,7 +275,7 @@ jobs:
               print(f"✅ {student}")
               print(f"   Score: {total}/100 - Grade: {grade}")
               if result['issues']:
-                  for issue in result['issues'][:2]:
+                  for issue in result['issues'][:3]:
                       print(f"   {issue}")
           
           # Save results
