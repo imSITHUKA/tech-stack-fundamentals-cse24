@@ -1,0 +1,377 @@
+name: 📊 Automated Grading - Reddit Browser (Changed Files Only)
+
+# Trigger on every push to main/master
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'Task 02/submissions/**'  # Only trigger if submissions folder changes
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'Task 02/submissions/**'
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed-students: ${{ steps.detect.outputs.students }}
+      has-changes: ${{ steps.detect.outputs.has-changes }}
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Detect changed submissions
+        id: detect
+        run: |
+          SUBMISSIONS_DIR="Task 02/submissions"
+          
+          if [ ! -d "$SUBMISSIONS_DIR" ]; then
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "students=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Get list of changed files
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PR, compare with base branch
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          else
+            # For push, compare with previous commit
+            if [ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]; then
+              # Initial commit - grade all
+              CHANGED_FILES=$(find "$SUBMISSIONS_DIR" -name "index.html" -type f)
+            else
+              CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} HEAD)
+            fi
+          fi
+          
+          # Extract student folders that changed
+          STUDENTS=$(echo "$CHANGED_FILES" | grep "Task 02/submissions/" | cut -d'/' -f4 | sort -u)
+          
+          if [ -z "$STUDENTS" ]; then
+            echo "ℹ️  No submissions changed"
+            echo "has-changes=false" >> $GITHUB_OUTPUT
+            echo "students=" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Changed students:"
+            echo "$STUDENTS" | while read -r student; do
+              echo "  - $student"
+            done
+            echo "has-changes=true" >> $GITHUB_OUTPUT
+            echo "students<<EOF" >> $GITHUB_OUTPUT
+            echo "$STUDENTS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          fi
+
+  grade-submissions:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 🔍 Grade changed submissions only
+        run: |
+          python3 << 'EOF'
+          import os
+          import json
+          import re
+          
+          SUBMISSIONS_DIR = "Task 02/submissions"
+          CHANGED_STUDENTS = """${{ needs.detect-changes.outputs.changed-students }}""".strip().split('\n')
+          
+          print("🎯 Grading changed submissions only:")
+          print(f"Students to grade: {len(CHANGED_STUDENTS)}")
+          for student in CHANGED_STUDENTS:
+              print(f"  ✓ {student}")
+          print()
+          
+          def grade_submission(student_folder, index_file):
+              """Grade a single submission"""
+              with open(index_file, 'r', encoding='utf-8') as f:
+                  content = f.read().lower()
+              
+              scores = {
+                  'file_structure': 2,
+                  'functionality': 0,
+                  'ui_design': 0,
+                  'code_quality': 0,
+                  'responsive': 0,
+                  'issues': []
+              }
+              
+              # Functionality checks (max 40)
+              if 'fetch(' in content:
+                  scores['functionality'] += 8
+              else:
+                  scores['issues'].append('❌ No fetch() API call')
+              
+              if 'reddit.com' in content:
+                  scores['functionality'] += 8
+              else:
+                  scores['issues'].append('❌ No Reddit API URL')
+              
+              if 'search' in content or 'input' in content:
+                  scores['functionality'] += 8
+              else:
+                  scores['issues'].append('⚠️  No search feature')
+              
+              if 'catch' in content or 'try' in content:
+                  scores['functionality'] += 10
+              else:
+                  scores['issues'].append('❌ No error handling')
+              
+              if 'onload' in content or 'eventlistener' in content:
+                  scores['functionality'] += 6
+              
+              # UI/Design checks (max 30)
+              if 'grid' in content:
+                  scores['ui_design'] += 10
+              else:
+                  scores['issues'].append('❌ No grid layout')
+              
+              if 'img' in content or 'image' in content:
+                  scores['ui_design'] += 8
+              else:
+                  scores['issues'].append('⚠️  No image handling')
+              
+              if 'comment' in content or 'upvote' in content or 'author' in content:
+                  scores['ui_design'] += 7
+              
+              if '<style>' in content:
+                  scores['ui_design'] += 5
+              else:
+                  scores['issues'].append('⚠️  Minimal CSS')
+              
+              # Code Quality (max 15)
+              function_count = content.count('function ')
+              if function_count >= 2:
+                  scores['code_quality'] += 5
+              
+              bad_vars = len(re.findall(r'var [a-z] [=;]', content))
+              if bad_vars < 3:
+                  scores['code_quality'] += 5
+              else:
+                  scores['issues'].append('⚠️  Poor variable naming')
+              
+              if 'console.log' not in content or 'this is a comment' in content:
+                  scores['code_quality'] += 5
+              
+              # Responsive (max 10)
+              if '@media' in content:
+                  scores['responsive'] += 8
+              else:
+                  scores['issues'].append('⚠️  No @media queries')
+              
+              if 'flex' in content or 'grid' in content:
+                  scores['responsive'] += 2
+              
+              return scores
+          
+          # Process ONLY changed submissions
+          results = []
+          
+          for student in CHANGED_STUDENTS:
+              if not student.strip():
+                  continue
+              
+              student_path = os.path.join(SUBMISSIONS_DIR, student.strip())
+              index_file = os.path.join(student_path, "index.html")
+              
+              if not os.path.exists(index_file):
+                  print(f"⚠️  {student}: Missing index.html")
+                  continue
+              
+              scores = grade_submission(student, index_file)
+              total = sum([
+                  scores['file_structure'],
+                  scores['functionality'],
+                  scores['ui_design'],
+                  scores['code_quality'],
+                  scores['responsive']
+              ])
+              
+              # Determine grade
+              if total >= 90:
+                  grade = 'A'
+              elif total >= 80:
+                  grade = 'B'
+              elif total >= 70:
+                  grade = 'C'
+              elif total >= 60:
+                  grade = 'D'
+              else:
+                  grade = 'F'
+              
+              result = {
+                  'student': student.strip(),
+                  **scores,
+                  'total': total,
+                  'grade': grade
+              }
+              results.append(result)
+              
+              print(f"✅ {student}")
+              print(f"   Score: {total}/100 - Grade: {grade}")
+              if result['issues']:
+                  for issue in result['issues'][:2]:
+                      print(f"   {issue}")
+          
+          # Save results
+          with open('grading_results.json', 'w') as f:
+              json.dump(results, f, indent=2)
+          
+          # Print summary
+          print("\n" + "="*50)
+          print("📊 SUMMARY")
+          print("="*50)
+          print(f"Submissions graded: {len(results)}")
+          if results:
+              avg_score = sum(r['total'] for r in results) / len(results)
+              print(f"Average score: {avg_score:.1f}/100")
+              
+              grades = {}
+              results.forEach(r => {
+                grades[r['grade']] = (grades.get(r['grade'], 0) + 1)
+              })
+              for grade in ['A', 'B', 'C', 'D', 'F']:
+                  count = sum(1 for r in results if r['grade'] == grade)
+                  if count > 0:
+                      print(f"  {grade}: {count}")
+          
+          EOF
+
+      - name: 📄 Generate markdown report
+        if: always()
+        run: |
+          python3 << 'EOF'
+          import json
+          
+          with open('grading_results.json', 'r') as f:
+              results = json.load(f)
+          
+          report = """# 📊 Reddit Browser - Grading Report (Changed Submissions)
+
+Generated by GitHub Actions on: $(date)
+
+## Summary
+
+- **Submissions Graded:** {total}
+- **Average Score:** {avg}/100
+
+## Individual Results
+
+""".format(
+              total=len(results),
+              avg=round(sum(r['total'] for r in results) / len(results), 1) if results else 0,
+          )
+          
+          for result in sorted(results, key=lambda x: x['total'], reverse=True):
+              grade_emoji = {'A': '🎉', 'B': '👍', 'C': '👌', 'D': '⚠️', 'F': '❌'}
+              emoji = grade_emoji.get(result['grade'], '❓')
+              
+              report += f"""
+          ### {result['student']} - {emoji} {result['grade']} ({result['total']}/100)
+          
+          | Category | Score |
+          |----------|-------|
+          | File Structure | {result['file_structure']}/5 |
+          | Functionality | {result['functionality']}/40 |
+          | UI/Design | {result['ui_design']}/30 |
+          | Code Quality | {result['code_quality']}/15 |
+          | Responsive | {result['responsive']}/10 |
+          | **TOTAL** | **{result['total']}/100** |
+          
+          """
+              
+              if result['issues']:
+                  report += "**Issues:**\n"
+                  for issue in result['issues']:
+                      report += f"- {issue}\n"
+                  report += "\n"
+          
+          with open('GRADING_REPORT.md', 'w') as f:
+              f.write(report)
+          
+          print("✅ Report generated: GRADING_REPORT.md")
+          
+          EOF
+
+      - name: 📦 Upload grading results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: grading-results-changed
+          path: |
+            grading_results.json
+            GRADING_REPORT.md
+
+      - name: 💬 Comment on PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('grading_results.json', 'utf8'));
+            
+            let comment = '# 📊 Grading Results (Changed Submissions Only)\n\n';
+            comment += `- **Submissions Graded:** ${results.length}\n`;
+            
+            if (results.length > 0) {
+              const avg = (results.reduce((sum, r) => sum + r.total, 0) / results.length).toFixed(1);
+              comment += `- **Average Score:** ${avg}/100\n\n`;
+              
+              comment += '### Results:\n\n';
+              results.forEach(r => {
+                const emoji = {'A': '🎉', 'B': '👍', 'C': '👌', 'D': '⚠️', 'F': '❌'}[r.grade] || '❓';
+                comment += `- **${r.student}**: ${emoji} ${r.grade} (${r.total}/100)\n`;
+              });
+            }
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: 📈 Create job summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          # 📊 Grading Complete (Changed Submissions)
+          
+          ✅ Only changed submissions were graded
+          📄 Report generated
+          📦 Results available as artifact
+          
+          [Download Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+
+  no-changes:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: ℹ️ No changes detected
+        run: |
+          echo "ℹ️  No submissions were changed in this push"
+          echo "Skipping grading workflow"
