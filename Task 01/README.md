@@ -2,8 +2,8 @@
 
 > *"Your portfolio is your first impression in the tech world!"* 💼
 
-![Last Updated](https://img.shields.io/badge/Last%20Updated-2025-12-18%2019%3A28%20UTC-blue)
-![Submissions](https://img.shields.io/badge/Submissions-1-green)
+![Last Updated](https://img.shields.io/badge/Last%20Updated-2025-12-19%2007%3A31%20UTC-blue)
+![Submissions](https://img.shields.io/badge/Submissions-8-green)
 
 ## 🎯 The Challenge
 Build a professional portfolio website showcasing your skills, projects, and background using semantic HTML and responsive CSS!
@@ -13,7 +13,13 @@ Build a professional portfolio website showcasing your skills, projects, and bac
 ## 🏅 Hall of Fame
 
 ### 🥇 First Place
-**Suhas_Dissa** - 6/100
+**Shaeshanth** - 86/100
+
+### 🥈 Second Place
+**Dihini** - 73/100
+
+### 🥉 Third Place
+**vishwa** - 60/100
 
 ---
 
@@ -21,7 +27,14 @@ Build a professional portfolio website showcasing your skills, projects, and bac
 
 | Rank | Student | Score | Grade | Title | Last Updated |
 |:----:|---------|:-----:|:-----:|-------|--------------|
-| 🥇 | **Suhas_Dissa** | 6/100 | 🔨 F | 👑 Portfolio Legend | 2025-12-18 19:28 UTC |
+| 🥇 | **Shaeshanth** | 86/100 | ✨ B | 👑 Portfolio Legend | 2025-12-19 07:31 UTC |
+| 🥈 | **Dihini** | 73/100 | 👌 C | 🥈 Design Master | 2025-12-19 07:21 UTC |
+| 🥉 | **vishwa** | 60/100 | 📝 D | 🥉 Rising Designer | 2025-12-19 06:33 UTC |
+| 4 | **Binuka** | 56/100 | 🔨 F | 🚀 Just Getting Started | 2025-12-19 07:23 UTC |
+| 5 | **Sachini_Gunasekara** | 38/100 | 🔨 F | 🚀 Just Getting Started | 2025-12-19 06:35 UTC |
+| 6 | **athishaya.j** | 31/100 | 🔨 F | 🚀 Just Getting Started | 2025-12-19 06:47 UTC |
+| 7 | **suhas** | 18/100 | 🔨 F | 🚀 Just Getting Started | 2025-12-19 06:26 UTC |
+| 8 | **Suhas_Dissa** | 6/100 | 🔨 F | 🚀 Just Getting Started | 2025-12-18 19:28 UTC |
 
 ---
 
@@ -39,7 +52,11 @@ Build a professional portfolio website showcasing your skills, projects, and bac
 
 ## 🚀 Recent Activity
 
-- **Suhas_Dissa** updated their portfolio → 6/100 (2025-12-18 19:28 UTC)
+- **Shaeshanth** updated their portfolio → 86/100 (2025-12-19 07:31 UTC)
+- **Binuka** updated their portfolio → 56/100 (2025-12-19 07:23 UTC)
+- **Dihini** updated their portfolio → 73/100 (2025-12-19 07:21 UTC)
+- **athishaya.j** updated their portfolio → 31/100 (2025-12-19 06:47 UTC)
+- **Sachini_Gunasekara** updated their portfolio → 38/100 (2025-12-19 06:35 UTC)
 
 ---
 

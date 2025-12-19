@@ -377,11 +377,16 @@ jobs:
           
           # Load existing leaderboard data if exists
           leaderboard_file = "Task 03/leaderboard_data.json"
+          all_results = {}
           if os.path.exists(leaderboard_file):
-              with open(leaderboard_file, 'r') as f:
-                  all_results = json.load(f)
-          else:
-              all_results = {}
+              try:
+                  with open(leaderboard_file, 'r') as f:
+                      content = f.read().strip()
+                      if content:
+                          all_results = json.loads(content)
+              except json.JSONDecodeError:
+                  print("⚠️ Invalid JSON in leaderboard file, starting fresh")
+                  all_results = {}
           
           # Update with new results
           current_time = datetime.now().strftime("%Y-%m-%d %H:%M UTC")
